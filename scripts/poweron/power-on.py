@@ -20,7 +20,7 @@ def waitForXapi(session,host):
     finished = False
     metrics = None
     while not finished and (attempts < 120):
-        attempts = attempts + 1
+        attempts += 1
         time.sleep(5)
         metrics = session.xenapi.host.get_metrics(host)
         try:

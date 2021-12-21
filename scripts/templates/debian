@@ -69,16 +69,16 @@ def create_partition(lvpath):
     # we don't care about.  Should fix to detect these cases
     # specifically.
     rc = pipe.close()
-    if rc == None: 
+    if rc is None: 
         rc = 0
         log("fdisk exited with rc %d (some non-zero exits can be ignored safely)." % rc)
 
 def map_partitions(lvpath):
     run("/sbin/kpartx -a %s", lvpath)
-    ps = []
-    for line in run("/sbin/kpartx -l %s" % lvpath).split("\n"):
-        ps.append("/dev/mapper/" + line.split()[0])
-    return ps
+    return [
+        "/dev/mapper/" + line.split()[0]
+        for line in run("/sbin/kpartx -l %s" % lvpath).split("\n")
+    ]
 
 def unmap_partitions(lvpath):
     run("/sbin/kpartx -d %s", lvpath)

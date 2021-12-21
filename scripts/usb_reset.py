@@ -339,11 +339,11 @@ if __name__ == "__main__":
 
     arg = parse_arg()
 
-    if "attach" == arg.command:
+    if arg.command == "attach":
         attach(arg.device, arg.domid, arg.pid, arg.reset_only)
-    elif "detach" == arg.command:
+    elif arg.command == "detach":
         detach(arg.device, arg.domid)
-    elif "cleanup" == arg.command:
+    elif arg.command == "cleanup":
         cleanup(arg.domid)
     else:
         log.error("Unexpected command: {}".format(arg.command))

@@ -108,7 +108,7 @@ if __name__ == "__main__":
         print("  %s <URL> <other-config key>" % (sys.argv[0]))
         print("  -- performs parallel operations on VMs with the specified other-config key")
         sys.exit(1)
-    
+
     x = xmlrpclib.Server(sys.argv[1])
     key = sys.argv[2]
     session = x.session.login_with_password("root", "xenroot", "1.0", "xen-api-scripts-minixenrt.py")["Value"]
@@ -129,8 +129,8 @@ if __name__ == "__main__":
     successes = 0
     failures = 0
     for w in workers:
-        successes = successes + w.num_successes
-        failures = failures + w.num_failures
+        successes += w.num_successes
+        failures += w.num_failures
     print("Total successes = %d" % successes)
     print("Total failures = %d" % failures)
     if failures == 0:

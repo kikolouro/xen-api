@@ -42,7 +42,7 @@ def find_host_mgmt_pif(session, host_uuid):
         if session.xenapi.PIF.get_management(pif):
             mgmt = pif
             break
-    if mgmt == None:
+    if mgmt is None:
         raise "Failed to find a management interface (PIF) for host uuid %s" % host_uuid
     return mgmt
 
@@ -51,9 +51,11 @@ def wake_on_lan(session, host, broadcast_addr, mac):
     sent to the broadcast_addr."""
     # A Wake-On-LAN packet contains FF:FF:FF:FF:FF:FF followed by 16 repetitions of the target MAC address
     target_mac = mac.split(":")
-    bin_payload = ""
-    for b in [ "FF" ] * 6 + (mac.split(":")) * 16:
-        bin_payload = bin_payload + struct.pack("B", int("0x" + b, 16))
+    bin_payload = "".join(
+        struct.pack("B", int("0x" + b, 16))
+        for b in ["FF"] * 6 + (mac.split(":")) * 16
+    )
+
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     addr = (broadcast_addr, 9) # Port 0, 7 or 9
@@ -64,7 +66,7 @@ def wake_on_lan(session, host, broadcast_addr, mac):
     finished = False
     metrics = None
     while not finished and (attempts < 60):
-        attempts = attempts + 1
+        attempts += 1
         syslog.syslog("Attempt %d sending WoL packet for MAC %s to %s" % (attempts, mac, broadcast_addr))
         s.send(bin_payload)
         time.sleep(5)

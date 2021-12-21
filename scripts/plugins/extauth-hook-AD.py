@@ -83,11 +83,7 @@ class PamSshConfig:
             return
         name = name_lines[0].split(":")[1].strip()
         uid_lines = filter(lambda x: x.startswith("Uid:"), lines)
-        if len(uid_lines) == 0:
-            is_group = True
-        else:
-            is_group = False
-
+        is_group = len(uid_lines) == 0
         if is_group:
             os.write(self.temp_fd, "account sufficient pam_succeed_if.so user ingroup %s\n" % name)
         else:

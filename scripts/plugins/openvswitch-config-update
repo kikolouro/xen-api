@@ -119,7 +119,7 @@ def update(session, args):
     dib_changed = False
     fail_mode_changed = False
     for bridge in vswitchCfgQuery(['list-br']).split():
-        if not bridge in bton:
+        if bridge not in bton:
             continue
         network = bton[bridge]
         bridge = vswitchCfgQuery(['br-to-parent', bridge])
@@ -176,7 +176,7 @@ def update(session, args):
         if new_controller and fail_mode_changed and pool_fail_mode == 'secure':
             oc = vswitchCfgQuery(['get', 'Bridge', bridge, 'other-config'])
             m = re.match('.*hwaddr="([0-9a-fA-F:].*)".*', oc)
-            if m and m.group(1) in pool_mgmt_macs.keys():
+            if m and m.group(1) in pool_mgmt_macs:
                 mgmt_bridge = bridge
                 host_mgmt_mac = m.group(1)
                 host_mgmt_device = pool_mgmt_macs[host_mgmt_mac]

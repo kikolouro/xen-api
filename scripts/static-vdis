@@ -99,9 +99,9 @@ def fresh_name():
     all = []
     try:
         all = os.listdir(main_dir)
-        for i in range(0, len(all) + 1): # guarantees to find a unique number
+        for i in range(len(all) + 1): # guarantees to find a unique number
             i = str(i)
-            if not(i in all):
+            if i not in all:
                 return i
     except:
         # Directory doesn't exist
@@ -140,7 +140,7 @@ def add(session, vdi_uuid, reason):
                 # Assume config is still valid
                 return
             raise Exception("Static configuration for VDI already exists")
-    
+
     vdi = session.xenapi.VDI.get_by_uuid(vdi_uuid)
     host = session.xenapi.host.get_by_uuid(inventory.get_localhost_uuid ())
     sr = session.xenapi.VDI.get_SR(vdi)
@@ -193,8 +193,8 @@ def add(session, vdi_uuid, reason):
     fresh = fresh_name()
     path = main_dir + "/" + fresh
     os.mkdir(path)
-    for key in data.keys():
-        write_whole_file(path + "/" + key, data[key])
+    for key, value in data.items():
+        write_whole_file(path + "/" + key, value)
 
 def delete(vdi_uuid):
     found = False
@@ -205,7 +205,7 @@ def delete(vdi_uuid):
             f = open(path + "/delete-next-boot", "w")
             f.close()
             # If not currently attached then zap the whole tree
-            if not("disk" in existing):
+            if "disk" not in existing:
                 os.system("/bin/rm -rf %s" % path)
     if not found:
         raise Exception("Disk configuration not found")
@@ -259,9 +259,11 @@ def disconnect_nbd_device(nbd_device):
 def parse_nbd_uri(uri):
     parts = uri.split(':')
     exportname_prefix = 'exportname='
-    if len(parts) != 4 or \
-            parts[0:2] != ['nbd', 'unix'] or \
-            not parts[3].startswith(exportname_prefix):
+    if (
+        len(parts) != 4
+        or parts[:2] != ['nbd', 'unix']
+        or not parts[3].startswith(exportname_prefix)
+    ):
         raise Exception('Got invalid NBD URI for SM backend: ' + uri)
     socket_path = parts[2]
     exportname = parts[3][len(exportname_prefix):]
@@ -273,7 +275,7 @@ def attach(vdi_uuid):
     for existing in list():
         if existing['vdi-uuid'] == vdi_uuid:
             found = True
-            if not('path' in existing):
+            if 'path' not in existing:
                 d = main_dir + "/" + existing['id'] 
                 # Delete any old symlink
                 try:
@@ -321,7 +323,7 @@ def detach(vdi_uuid):
     found = False
     for existing in list():
         if existing['vdi-uuid'] == vdi_uuid:
-            if not ('disk' in existing):
+            if 'disk' not in existing:
                 return
             found = True
             d = main_dir + "/" + existing['id']

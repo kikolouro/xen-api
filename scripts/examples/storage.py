@@ -45,7 +45,7 @@ class Loop:
             line = line.strip()
             if line != "":
                 bits = line.split()
-                loop = bits[0][0:-1]
+                loop = bits[0][:-1]
                 this_path = bits[2][1:-1]
                 if this_path == path:
                     return loop
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     if options.logfile:
         from smapiv2 import reopenlog
         reopenlog(options.logfile)
-    if not options.ip and not options.ip:
+    if not options.ip:
         print("Need an --ip-addr and --port. Use -h for help", file=sys.stderr)
         sys.exit(1)
 

@@ -27,10 +27,11 @@ def reopenlog(log_file):
     global log_f
     if log_f:
         log_f.close()
-    if log_file and log_file != "stdout:":
-        log_f = open(log_file, "aw")
-    elif log_file and log_file == "stdout:":
-        log_f = os.fdopen(os.dup(sys.stdout.fileno()), "aw")
+    if log_file:
+        if log_file != "stdout:":
+            log_f = open(log_file, "aw")
+        else:
+            log_f = os.fdopen(os.dup(sys.stdout.fileno()), "aw")
 
 def log(txt):
     global log_f, pid, use_syslog
@@ -115,11 +116,11 @@ def import_metadata(server, session, filename):
         if len(nodes) != 1:
             print("Expecting exactly one %s tag" % name, file=sys.stderr)
             sys.exit(1)
-        result = ""
-        for child in nodes[0].childNodes:
-            if child.nodeType == child.TEXT_NODE:
-                result = result + child.data
-        return result
+        return "".join(
+            child.data
+            for child in nodes[0].childNodes
+            if child.nodeType == child.TEXT_NODE
+        )
     def getAttr(doc, name):
         for (n, value) in doc.attributes.items():
             if name == n:
@@ -228,7 +229,7 @@ if __name__ == "__main__":
         }
 
     log("settings = %s" % repr(settings))
-    
+
     parser = OptionParser(usage="usage: %prog [options] filename.xml")
     parser.add_option("-l", "--log", dest="logfile", help="log to LOG", metavar="LOG")
     parser.add_option("-s", "--server", dest="server", help="connect to SERVER", metavar="SERVER")
@@ -243,9 +244,7 @@ if __name__ == "__main__":
     for setting in settings:
         if setting in options and options[setting]:
             settings[setting] = options[setting]
-            s = repr(settings[setting])
-            if setting == "password":
-                s = "*REDACTED*"
+            s = "*REDACTED*" if setting == "password" else repr(settings[setting])
             log("option settings[%s] <- %s" % (setting, s))
 
     if settings["log"] == "syslog:":

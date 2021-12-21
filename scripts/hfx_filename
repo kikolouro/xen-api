@@ -45,12 +45,11 @@ def rpc(session_id, request):
           return
         id = result.find("\r\n\r\n")
         headers = result[:id]
+        cl = "content-length:"
         for line in headers.split("\r\n"):
-          cl = "content-length:"
-          if line.lower().startswith(cl):
-             length = int(line[len(cl):].strip())
-        body = result[id+4:]
-        return body
+            if line.lower().startswith(cl):
+               length = int(line[len(cl):].strip())
+        return result[id+4:]
     finally:
         s.close()
 
@@ -67,13 +66,11 @@ def parse_string(txt):
 
 def db_get_by_uuid(session_id, table, uuid):
     request = "<value><array><data><value>db_get_by_uuid</value><value/><value><array><data><value>%s</value><value>%s</value></data></array></value></data></array></value>" % (table, uuid)
-    response = parse_string(rpc(session_id, request))
-    return response
+    return parse_string(rpc(session_id, request))
 
 def read_field(session_id, table, fld, rf):
     request = "<value><array><data><value>read_field</value><value/><value><array><data><value>%s</value><value>%s</value><value>%s</value></data></array></value></data></array></value>" % (table, fld, rf)
-    response = parse_string(rpc(session_id, request))
-    return response
+    return parse_string(rpc(session_id, request))
 
 if __name__ == "__main__":
     import XenAPI

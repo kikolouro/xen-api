@@ -56,30 +56,23 @@ def print_debug(string):
 def log_err(string):
     print(string, file=sys.stderr)
     syslog.syslog(syslog.LOG_USER | syslog.LOG_ERR, "PERFMON: %s" % string)
-    pass
 
 def log_info(string):
     print(string, file=sys.stderr)
     syslog.syslog(syslog.LOG_INFO | syslog.LOG_INFO, "PERFMON: %s" % string)
-    pass
 
 def debug_mem():
     objCount = {}
     gc.collect()
     objList = gc.get_objects()
     for obj in objList:
-        if getattr(obj, "__class__", None):
-            name = obj.__class__.__name__
-        else:
-            name = type(obj)
+        name = obj.__class__.__name__ if getattr(obj, "__class__", None) else type(obj)
         if name in objCount:
             objCount[name] += 1
         else:
             objCount[name] = 1
-        
-        output = []
-        for name in objCount:
-            output.append("%s :%s" % (name, objCount[name]))
+
+        output = ["%s :%s" % (name, value) for name, value in objCount.items()]
     log_info("\n".join(output))
 
 class PerfMonException(Exception):
@@ -293,7 +286,7 @@ class RRDUpdates:
     """
     def __init__(self):
         # params are what get passed to the CGI executable in the URL
-        self.params = dict()
+        self.params = {}
         self.params['start'] = int(time.time()) - interval # interval seconds ago
         self.params['host'] = 'true'   # include data for host (as well as for VMs)
         self.params['sr_uuid'] = 'all' # include data for all SRs attached to this host
@@ -358,13 +351,11 @@ def get_percent_log_fs_usage(ignored):
     log_fs_output = commands.getoutput('df /var/log')
     fs_output = ' '.join(fs_output.splitlines()[1:])
     log_fs_output = ' '.join(log_fs_output.splitlines()[1:])
-    # Get the percent usage only when there is a separate logs partition
-    if (fs_output.split()[0] != log_fs_output.split()[0]):
-        percentage = log_fs_output.split()[4]
-        # remove % character and convert to float
-        return float(percentage[0:-1])/100.0
-    else:
+    if fs_output.split()[0] == log_fs_output.split()[0]:
         return float('NaN')
+    percentage = log_fs_output.split()[4]
+        # remove % character and convert to float
+    return float(percentage[:-1]) / 100.0
 
 def get_percent_fs_usage(ignored):
     "Get the percent usage of the host filesystem.  Input list is ignored and should be empty"
@@ -373,14 +364,13 @@ def get_percent_fs_usage(ignored):
     output = ' '.join(output.splitlines()[1:]) # remove header line and rewrap on single line
     percentage = output.split()[4]
     # remove % character and convert to float
-    return float(percentage[0:-1])/100.0
+    return float(percentage[:-1]) / 100.0
 
 def get_percent_mem_usage(ignored):
     "Get the percent usage of Dom0 memory/swap. Input list is ignored and should be empty"
     try:
-        memfd = open('/proc/meminfo', 'r')
-        memlist = memfd.readlines()
-        memfd.close()
+        with open('/proc/meminfo', 'r') as memfd:
+            memlist = memfd.readlines()
         memdict = [ m.split(':', 1) for m in memlist ]
         memdict = dict([(k.strip(), float(re.search('\d+', v.strip()).group(0))) for (k,v) in memdict])
         # We consider the sum of res memory and swap in use as the hard demand
@@ -401,7 +391,7 @@ def get_percent_sr_usage(mylist):
     try:
         if len(mylist) != 2:
             raise Exception("Incorrect number of values to consolidate: %d (exactly 2 values)" % len(mylist))
-        physical_utilisation, size = mylist[0:2]
+        physical_utilisation, size = mylist[:2]
         return float(physical_utilisation) / size
     except Exception as e:
         log_err("Error %s in get_percent_sr_usage, return 0.0 instead" % e)
@@ -554,19 +544,18 @@ class ObjectMonitor:
         self.refresh_config()
         
     def refresh_config(self):
-        if self.__update_xmlconfig():
-            # config has changed - reparse it
-            try:
-                self.__parse_xmlconfig()
-            except XmlConfigException as e:
-                errmsg = "\n".join([ str(x) for x in e.args ])
-                log_err("%s %s config error: %s" % (self.monitortype, self.uuid, errmsg))
-            except ExpatError as e:
-                errmsg = "\n".join([ str(x) for x in e.args ])
-                log_err("%s %s XML parse error: %s" % (self.monitortype, self.uuid, errmsg))
-            return True
-        else:
+        if not self.__update_xmlconfig():
             return False # config unchanged
+        # config has changed - reparse it
+        try:
+            self.__parse_xmlconfig()
+        except XmlConfigException as e:
+            errmsg = "\n".join([ str(x) for x in e.args ])
+            log_err("%s %s config error: %s" % (self.monitortype, self.uuid, errmsg))
+        except ExpatError as e:
+            errmsg = "\n".join([ str(x) for x in e.args ])
+            log_err("%s %s XML parse error: %s" % (self.monitortype, self.uuid, errmsg))
+        return True
 
     def __update_xmlconfig(self):
         if self.uuid not in all_xmlconfigs:
@@ -698,8 +687,7 @@ class VMMonitor(ObjectMonitor):
         elif config_tag == 'alarm_trigger_period':      return '60'   # 1 minute
         elif config_tag == 'alarm_auto_inhibit_period': return '3600' # 1 hour
         elif config_tag == 'alarm_trigger_level': 
-            if variable_name == "fs_usage": return '0.9'              # trigger when 90% full
-            elif variable_name == "log_fs_usage": return '0.9'        # trigger when 90% full
+            if variable_name in ["fs_usage", "log_fs_usage"]: return '0.9'              # trigger when 90% full
             elif variable_name == "mem_usage": return '0.95'          # tigger when mem demanded is close to phy_mem
             else:raise XmlConfigException("variable %s: no default alarm_trigger_level - please specify one" % variable_name)
         elif config_tag == 'alarm_trigger_sense':       return 'high' # trigger if *above*
@@ -886,7 +874,7 @@ class HOSTMonitor(ObjectMonitor):
                     # A host can only have one Variable from a given SR since we only accept one kind (one name).
                     break
                 found = True
-                name_override = 'sr_io_throughput_total_%s' % sruuid[0:8]
+                name_override = 'sr_io_throughput_total_%s' % sruuid[:8]
                 name_element.setAttribute('value', name_override)
                 provenance_element = xmldoc.createElement('configured_on')
                 provenance_element.setAttribute('class', 'SR')
@@ -988,22 +976,22 @@ def main():
             ["interval=", "numloops=","debug","rrdstep=","config_update_period=","interval_percent_dither="])
     except getopt.GetoptError:
         raise UsageException
-    
+
     configfname = None
     for opt, arg in opts:
-        if opt == '-i' or opt == '--interval':
+        if opt in ['-i', '--interval']:
             interval = int(arg)
-        elif opt == '-n' or opt == '--numloops':
+        elif opt in ['-n', '--numloops']:
             maxruns = int(arg)
-        elif opt == '-d' or opt == '--debug':
+        elif opt in ['-d', '--debug']:
             debug = True
-        elif opt == '-s' or opt == '--rrdstep':
+        elif opt in ['-s', '--rrdstep']:
             rrd_step = int(arg)
-            if rrd_step != 5 and rrd_step != 60:
+            if rrd_step not in [5, 60]:
                 raise UsageException
-        elif opt == '-c' or opt == '--config_update_period':
+        elif opt in ['-c', '--config_update_period']:
             config_update_period = int(arg)
-        elif opt == '-D' or opt == '--interval_percent_dither':
+        elif opt in ['-D', '--interval_percent_dither']:
             interval_percent_dither = int(arg)
         else:
             raise UsageException
@@ -1028,7 +1016,7 @@ def main():
     # from the master, so we only do it once every config_update_period
     # and we cache the results
     next_config_update = time.time()
-    
+
     # monitors for vms running on this host.
     # This dictionary uses uuids to lookup each monitor object
     vm_mon_lookup = {}
@@ -1039,7 +1027,7 @@ def main():
 
     # The monitor for the host
     host_mon = None
-    
+
     runs = 0
     while True:
         print_debug("Run: %d" % runs)
@@ -1052,13 +1040,13 @@ def main():
                 restart_session = False
 
             rrd_updates.refresh(session)
-        
+
             # Should we update all_xmlconfigs
             if time.time() >= next_config_update:
                 print_debug("Updating all_xmlconfigs")
                 # yes - update all the xml configs: this generates a few LARGE xapi messages from the master
                 update_all_xmlconfigs(session)
-                
+
                 # Set time when to do this next
                 next_config_update = time.time() + config_update_period
 
@@ -1066,18 +1054,18 @@ def main():
             vm_uuid_list = rrd_updates.get_uuid_list_by_objtype('vm')
 
             # Remove any monitors for VMs no longer listed in rrd_updates page
-            for uuid in vm_mon_lookup.keys():
+            for uuid in vm_mon_lookup:
                 if uuid not in vm_uuid_list:
                     vm_mon_lookup.pop(uuid)
-                
+
             # Create monitors for VMs that have just appeared in rrd_updates page
             for uuid in vm_uuid_list:
-                if uuid not in vm_mon_lookup.keys():
-                    vm_mon_lookup[uuid] = VMMonitor(uuid)
-                else:
+                if uuid in vm_mon_lookup:
                     # check if the config has changed, e.g. by XenCenter
                     vm_mon_lookup[uuid].refresh_config()
-            
+
+                else:
+                    vm_mon_lookup[uuid] = VMMonitor(uuid)
             # Remove monitor for the host if it's no longer listed in rrd_updates page
             # Create monitor for the host if it has just appeared in rrd_updates page
             try:
@@ -1102,16 +1090,16 @@ def main():
             print_debug("sr_uuid_list = %s" % sr_uuid_list)
 
             # Remove monitors for SRs no longer listed in the rrd_updates page
-            for uuid in sr_mon_lookup.keys():
+            for uuid in sr_mon_lookup:
                 if uuid not in sr_uuid_list:
                     sr_mon_lookup.pop(uuid)
             # Create monitors for SRs that have just appeared in rrd_updates page
             for uuid in sr_uuid_list:
-                if uuid not in sr_mon_lookup.keys():
-                    sr_mon_lookup[uuid] = SRMonitor(uuid)
-                else:
+                if uuid in sr_mon_lookup:
                     sr_mon_lookup[uuid].refresh_config()
 
+                else:
+                    sr_mon_lookup[uuid] = SRMonitor(uuid)
             # Go through each vm_mon and update it using the rrd_udpates - this may generate alarms
             for vm_mon in vm_mon_lookup.values():
                 vm_mon.process_rrd_updates(rrd_updates, session)
@@ -1128,19 +1116,14 @@ def main():
             if e.args[0] == 111:
                 # "Connection refused" - this happens when we try to restart session and *that* fails
                 time.sleep(2)
-                pass
-
             log_err("caught socket.error: (%s) - restarting XAPI session" % " ".join([str(x) for x in e.args]))
             restart_session = True
 
         except IOError as e:
             if e.args[0] == 'http error' and e.args[1] in (401, 500):
                 # Error getting rrd_updates: 401=Unauthorised, 500=Internal - start new session
-                pass 
-            elif e.args[0] == 'socket error':
-                # This happens if we send messages or read other-config:perfmon after xapi is restarted
                 pass
-            else:
+            elif e.args[0] != 'socket error':
                 # Don't know why we got this error - crash, die and look at logs later
                 raise
 
@@ -1171,7 +1154,7 @@ def main():
             else:
                 log_err("received unhandled command %s" % cmd)
 
-        # continue to next run
+            # continue to next run
 
     return 0
 
@@ -1185,7 +1168,7 @@ if __name__ == "__main__":
     
     # setup signal handler to print out notice when killed
     signal.signal(signal.SIGTERM, sigterm_handler)
-    
+
     if '--daemon' in sys.argv[1:]:
         sys.argv.remove('--daemon')
         if os.fork() != 0:
@@ -1194,7 +1177,7 @@ if __name__ == "__main__":
         sys.stdout=open("/dev/null", 'w')
         sys.stdin=open("/dev/null", 'r')
         sys.stderr=sys.stdout
-        
+
     # Exit if perfmon already running
     if os.path.exists(pidfile):
         pid = open(pidfile).read()
@@ -1203,11 +1186,8 @@ if __name__ == "__main__":
             sys.exit(3)
 
     try:
-        # Write out pidfile 
-        fd = open(pidfile,"w")
-        fd.write("%d" % os.getpid())
-        fd.close()
-
+        with open(pidfile,"w") as fd:
+            fd.write("%d" % os.getpid())
         # run the main loop
         rc = main()
 
@@ -1236,7 +1216,7 @@ if __name__ == "__main__":
         log_err("Exception is of class %s" % e.__class__)
         ex = sys.exc_info()
         err = traceback.format_exception(*ex)
-        
+
         # Python built-in Exception has args,
         # but XenAPI.Failure has details instead. Sigh.
         try:

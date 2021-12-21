@@ -97,10 +97,7 @@ def is_this_pool_patch_uuid(session, s):
     if is_this_uuid(s):
         try:
             p_ref = session.xenapi.pool_patch.get_by_uuid(s)
-            if p_ref is None or p_ref == "":
-                return False
-            else:
-                return True
+            return p_ref is not None and p_ref != ""
         except:
             return False
     else:
@@ -113,13 +110,12 @@ def get_patch_filename(session, uuid):
 
     (rc, out) = cmd.runCmd(['/opt/xensource/bin/hfx_filename', uuid],
                                  with_stdout = True)
-    if rc == 0:
-        # This file might exists only on the master
-        file_name = out.strip()
-        if os.path.exists(file_name):
-            return file_name
-        else:
-            return ""
+    if rc != 0:
+        return ""
+    # This file might exists only on the master
+    file_name = out.strip()
+    if os.path.exists(file_name):
+        return file_name
     else:
         return ""
 

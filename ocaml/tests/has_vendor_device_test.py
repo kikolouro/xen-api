@@ -15,8 +15,7 @@ base_request = {'user_version':'1', 'is_a_template':False, 'affinity':'', 'memor
 #
 
 def create():
-    res = s.VM.create(sess, base_request)
-    return res
+    return s.VM.create(sess, base_request)
 
 def create_with_vd(b):
     request = base_request.copy()

@@ -273,8 +273,7 @@ class UsbInterface(UsbObject):
                 self[p] = props.get(p)
 
     def debug_str(self, level=0):
-        s = super(UsbInterface, self).debug_str(level)
-        return s
+        return super(UsbInterface, self).debug_str(level)
 
     def is_class_hub(self):
         return self._is_class_hub(self._CLASS)
@@ -362,7 +361,7 @@ class Policy(object):
             with open(self._PATH, "r") as f:
                 log.debug("=== policy file begin")
                 for line in f:
-                    log.debug(line[0:-1])
+                    log.debug(line[:-1])
                     self.parse_line(line)
                 log.debug("=== policy file end")
         except IOError as e:
@@ -375,9 +374,9 @@ class Policy(object):
 
     def check_hex_length(self, name, value):
         if name in [self._CLASS, self._SUBCLASS, self._PROTOCOL]:
-            return 2 == len(value)
+            return len(value) == 2
         if name in [self._ID_VENDOR, self._ID_PRODUCT, self._BCD_DEVICE]:
-            return 4 == len(value)
+            return len(value) == 4
         return False
 
     @staticmethod
@@ -405,7 +404,7 @@ class Policy(object):
         # ^([^#]*)(#.*)?$
         i = line.find("#")
         if i > 0:
-            line = line[0:i]
+            line = line[:i]
         elif i == 0:
             # full length comment, just return
             return
@@ -435,21 +434,15 @@ class Policy(object):
         # 4. parse key=value pairs
         # pattern = r"\s*(class|subclass|prot|vid|pid|rel)\s*=\s*([0-9a-f]+)"
         last_end = 0
-        for matchNum, match in enumerate(re.finditer(self._PATTERN, target,
-                                                     re.IGNORECASE)):
+        for match in re.finditer(self._PATTERN, target,
+                                                     re.IGNORECASE):
             if last_end != match.start():
                 self.parse_error(last_end, match.start(), target, line)
 
             try:
                 name, value = [part.lower() for part in match.groups()]
-            # This can happen if `part` is None
-            except AttributeError:
+            except (AttributeError, ValueError):
                 self.parse_error(match.start(), match.end(), target, line)
-            # This should never happen, because the regexp has exactly two
-            # matching groups
-            except ValueError:
-                self.parse_error(match.start(), match.end(), target, line)
-
             if not self.check_hex_length(name, value):
                 log_exit("hex'{}' length error, malformed line {}".format(
                     str(value), line))
@@ -588,9 +581,8 @@ def to_pusb(device):
     :param device:(UsbDevice) the device to convert
     :return:(dict) the key value pairs for pusb
     """
-    pusb = {}
+    pusb = {'path': device.get_node()}
 
-    pusb["path"] = device.get_node()
     # strip the leading space of "version"
     pusb["version"] = device[UsbDevice._VERSION].strip()
     pusb["vendor-id"] = device[UsbDevice._ID_VENDOR]
