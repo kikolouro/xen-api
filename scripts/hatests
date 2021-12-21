@@ -32,10 +32,12 @@ def check(svm, ip):
             if k not in hosts2 :
                 print("From " + ip + " point of view " + hosts[k]["address"] + " is not present any more.")
     vmrecords2 = svm.xenapi.VM.get_all_records()
-    vmrunning2 = {}
-    for k, v in vmrecords2.iteritems() :
-        if v['power_state'] == 'Running' and int(v['domid']) == 0:
-            vmrunning2[k] = v
+    vmrunning2 = {
+        k: v
+        for k, v in vmrecords2.iteritems()
+        if v['power_state'] == 'Running' and int(v['domid']) == 0
+    }
+
     if len(vmrunning) != len(vmrunning2) :
         print("From " + ip + " point of view some VMs have changed state.")
         flag = False
@@ -67,11 +69,11 @@ secs = 120
 
 optlist, args = getopt.getopt(sys.argv[1:],"w:h", ["wait=", "help"])
 for o, a in optlist:
-        if o == "-w" or o == "--wait":
-            secs = int(a)
-        elif o == "-h" or o == "--help" :
-            help()
-            sys.exit(0)
+    if o in ["-w", "--wait"]:
+        secs = int(a)
+    elif o in ["-h", "--help"]:
+        help()
+        sys.exit(0)
 
 if len(args) != 1 :
     help()
@@ -117,29 +119,27 @@ except XenAPI.Failure as inst:
     svm = XenAPI.Session("http://" +  masterip)
     svm.login_with_password('root', 'xenroot', '1.0', 'xen-api-scripts-hatest')
     masterref = svm.xenapi.pool.get_all_records().values()[0]['master']
-for i in slaves :
-    if masterip == i[1] :
+for i in slaves:
+    if masterip == i[1]:
         master = i
-        slaves.remove(i)
+        slaves.remove(master)
         break
 print("Master ip address is " + master[1])
 
-#getting ip -> hostref references
-hosts = {}
 hostsrecs = svm.xenapi.host.get_all_records()
-for k, v in hostsrecs.iteritems() :
-    hosts[v['address']] = k
-
-#getting the VM running
-vmrunning = {}
+#getting ip -> hostref references
+hosts = {v['address']: k for k, v in hostsrecs.iteritems()}
 vmrecords = svm.xenapi.VM.get_all_records()
-for k, v in vmrecords.iteritems() :
-    if v['power_state'] == 'Running' and int(v['domid']) == 0:
-        vmrunning[k] = v
+#getting the VM running
+vmrunning = {
+    k: v
+    for k, v in vmrecords.iteritems()
+    if v['power_state'] == 'Running' and int(v['domid']) == 0
+}
 
 bringup = None
 vifbringup = None
-if sys.argv[-1] == "master_hard_failure" :
+if sys.argv[-1] == "master_hard_failure":
     print("Shutting down the master")
     s.xenapi.VM.hard_shutdown(master[0])
     bringup = master[0]
@@ -151,11 +151,6 @@ elif sys.argv[-1] == "slave_hard_failure" :
     r = random.randint(0, len(slaves) - 1)
     print("Shutting down slave " + slaves[r][1])
     s.xenapi.VM.hard_shutdown(slaves[r][0])
-    bringup = slaves[r][0]
-elif sys.argv[-1] == "slave_hard_failure" :
-    r = random.randint(0, len(slaves) - 1)
-    print("Shutting down slave " + slaves[r][1])
-    s.xenapi.VM.clean_shutdown(slaves[r][0])
     bringup = slaves[r][0]
 elif sys.argv[-1] == "master_vif_unplug" :
     print("Unplugging the first found attached VIF in the master")
@@ -169,11 +164,11 @@ elif sys.argv[-1] == "master_vif_unplug" :
 
 print("Waiting " + str(secs) + " seconds")
 count = 0
-while count < secs :
+while count < secs:
     time.sleep(1)
     sys.stdout.write(".")
     sys.stdout.flush()
-    count = count + 1
+    count += 1
 sys.stdout.write("\n")
 
 if bringup is not None :
@@ -185,11 +180,11 @@ if vifbringup is not None :
 
 print("Waiting " + str(secs) + " seconds")
 count = 0
-while count < secs :
+while count < secs:
     time.sleep(1)
     sys.stdout.write(".")
     sys.stdout.flush()
-    count = count + 1
+    count += 1
 sys.stdout.write("\n")
 
 print("Collecting logs now...")

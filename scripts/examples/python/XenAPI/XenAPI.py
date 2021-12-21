@@ -130,8 +130,11 @@ class Session(xmlrpclib.ServerProxy):
 
         # Fix for CA-172901 (+ Python 2.4 compatibility)
         # Fix for context=ctx ( < Python 2.7.9 compatibility)
-        if not (sys.version_info[0] <= 2 and sys.version_info[1] <= 7 and sys.version_info[2] <= 9 ) \
-                and ignore_ssl:
+        if (
+            sys.version_info[0] > 2
+            or sys.version_info[1] > 7
+            or sys.version_info[2] > 9
+        ) and ignore_ssl:
             import ssl
             ctx = ssl._create_unverified_context()
             xmlrpclib.ServerProxy.__init__(self, uri, transport, encoding,
@@ -150,23 +153,20 @@ class Session(xmlrpclib.ServerProxy):
         if methodname.startswith('login'):
             self._login(methodname, params)
             return None
-        elif methodname == 'logout' or methodname == 'session.logout':
+        elif methodname in ['logout', 'session.logout']:
             self._logout()
             return None
         else:
-            retry_count = 0
-            while retry_count < 3:
+            for _ in range(3):
                 full_params = (self._session,) + params
                 result = _parse_result(getattr(self, methodname)(*full_params))
-                if result is _RECONNECT_AND_RETRY:
-                    retry_count += 1
-                    if self.last_login_method:
-                        self._login(self.last_login_method,
-                                    self.last_login_params)
-                    else:
-                        raise xmlrpclib.Fault(401, 'You must log in')
-                else:
+                if result is not _RECONNECT_AND_RETRY:
                     return result
+                if self.last_login_method:
+                    self._login(self.last_login_method,
+                                self.last_login_params)
+                else:
+                    raise xmlrpclib.Fault(401, 'You must log in')
             raise xmlrpclib.Fault(
                 500, 'Tried 3 times to get a valid session, but failed')
 
@@ -231,14 +231,13 @@ def _parse_result(result):
             raise xmlrpclib.Fault(500,
                                   'Missing Value in response from server')
     else:
-        if 'ErrorDescription' in result:
-            if result['ErrorDescription'][0] == 'SESSION_INVALID':
-                return _RECONNECT_AND_RETRY
-            else:
-                raise Failure(result['ErrorDescription'])
-        else:
+        if 'ErrorDescription' not in result:
             raise xmlrpclib.Fault(
                 500, 'Missing ErrorDescription in response from server')
+        if result['ErrorDescription'][0] == 'SESSION_INVALID':
+            return _RECONNECT_AND_RETRY
+        else:
+            raise Failure(result['ErrorDescription'])
 
 
 # Based upon _Method from xmlrpclib.

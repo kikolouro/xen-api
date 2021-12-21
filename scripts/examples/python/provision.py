@@ -34,8 +34,7 @@ class Disk:
         disk.setAttribute("device", self.device)
         disk.setAttribute("size", self.size)
         disk.setAttribute("sr", self.sr)
-        b = "false"
-        if self.bootable: b = "true"
+        b = "true" if self.bootable else "false"
         disk.setAttribute("bootable", b)
         return disk
 

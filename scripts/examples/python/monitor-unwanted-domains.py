@@ -30,21 +30,20 @@ def should_domain_be_somewhere_else(localhost_uuid, domain):
         x = XenAPI.xapi_local()
         x.xenapi.login_with_password("root", "", "1.0", "xen-api-scripts-monitor-unwanted-domains.py")
         try:
-            try:
-                vm = x.xenapi.VM.get_by_uuid(uuid)
-                resident_on = x.xenapi.VM.get_resident_on(vm)
-                current_operations = x.xenapi.VM.get_current_operations(vm)
-                result = current_operations == {} and resident_on != localhost_uuid
-                if result:
-                    log("domid %s uuid %s: is not being operated on and is not resident here" % (domid, uuid))
-                    return result
-            except XenAPI.Failure as e:
-                if e.details[0] == "UUID_INVALID":
-                    # VM is totally bogus
-                    log("domid %s uuid %s: is not in the xapi database" % (domid, uuid))
-                    return True
-                # fail safe for now
-                return False
+            vm = x.xenapi.VM.get_by_uuid(uuid)
+            resident_on = x.xenapi.VM.get_resident_on(vm)
+            current_operations = x.xenapi.VM.get_current_operations(vm)
+            result = current_operations == {} and resident_on != localhost_uuid
+            if result:
+                log("domid %s uuid %s: is not being operated on and is not resident here" % (domid, uuid))
+                return result
+        except XenAPI.Failure as e:
+            if e.details[0] == "UUID_INVALID":
+                # VM is totally bogus
+                log("domid %s uuid %s: is not in the xapi database" % (domid, uuid))
+                return True
+            # fail safe for now
+            return False
         finally:
             x.xenapi.logout()
     except:
@@ -71,7 +70,7 @@ if __name__ == "__main__":
         time.sleep(1)
         paused = list_paused_domains ()
         # GC the domain_first_noticed map
-        for d in domain_first_noticed.keys():
+        for d in domain_first_noticed:
             if d not in paused:
                 log("domid %s uuid %s: looks ok now, forgetting about it" % d)
                 del domain_first_noticed[d]

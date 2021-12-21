@@ -21,8 +21,7 @@ class MocDeviceAttrs(Mapping):
         self.d = device.get_attr()
 
     def __iter__(self):
-        for name in self.d:
-            yield name
+        yield from self.d
 
     def __len__(self):
         return len(self.d)
@@ -51,8 +50,7 @@ class MocDevice(Mapping):
         return MocDeviceAttrs(self)
 
     def __iter__(self):
-        for name in self.get_prop():
-            yield name
+        yield from self.get_prop()
 
     def __len__(self):
         return len(self.get_prop())
@@ -78,11 +76,11 @@ class MocContext(object):
         self.interfaces = interfaces
 
     def list_devices(self, **kwargs):
-        if "usb" == kwargs.pop("subsystem"):
+        if kwargs.pop("subsystem") == "usb":
             dev_type = kwargs.pop("DEVTYPE")
-            if "usb_device" == dev_type:
+            if dev_type == "usb_device":
                 return MocEnumerator(self.devices)
-            elif "usb_interface" == dev_type:
+            elif dev_type == "usb_interface":
                 return MocEnumerator(self.interfaces)
         return MocEnumerator([])
 

@@ -27,9 +27,11 @@ def main(argv):
     for tmplref in templates.keys():
         tmplrec = templates[tmplref]
         try:
-            if not tmplrec['other_config'].has_key('default_template'):
-                output.append(tmplrec['uuid'])
-            elif tmplrec['other_config']['default_template'] != true:
+            if (
+                not tmplrec['other_config'].has_key('default_template')
+                or tmplrec['other_config'].has_key('default_template')
+                and tmplrec['other_config']['default_template'] != true
+            ):
                 output.append(tmplrec['uuid'])
         except:
             pass

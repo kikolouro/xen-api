@@ -69,12 +69,11 @@ def execute_apply(session, update_package, yum_conf_file):
             raise InvalidUpdate('Missing package(s) in the update.')
 
         m = re.search('(?<=' + ERROR_MESSAGE_START + ').+$', output, flags=re.DOTALL)
-        if m:
-            errmsg = m.group()
-            errmsg = re.sub(ERROR_MESSAGE_END + '.+', '', errmsg, flags=re.DOTALL)
-            raise ApplyFailure(errmsg)
-        else:
+        if not m:
             raise ApplyFailure(output)
+        errmsg = m.group()
+        errmsg = re.sub(ERROR_MESSAGE_END + '.+', '', errmsg, flags=re.DOTALL)
+        raise ApplyFailure(errmsg)
 
 
 def remove_group(group, yum_conf_file):
@@ -143,9 +142,7 @@ if __name__ == '__main__':
             try:
                 os.makedirs(os.path.dirname(yum_conf_file))
             except OSError as e:
-                if e.errno == errno.EEXIST:
-                    pass
-                else:
+                if e.errno != errno.EEXIST:
                     raise
             with open (yum_conf_file, "w+") as file:
                 file.write("{0}".format(yum_conf))

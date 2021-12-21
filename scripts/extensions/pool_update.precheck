@@ -115,18 +115,14 @@ def parse_precheck_failure(xmldoc):
     error = xmldoc.getElementsByTagName(ERROR)[0]
     code = error.getAttribute(ERRORCODE)
 
-    if code in errors:
-        params = [xmldoc.getElementsByTagName(a)[0].firstChild.nodeValue for a in errors[code]]
-        raise PrecheckError(code, *params)
-    else:
+    if code not in errors:
         raise PrecheckFailure(xmldoc.toxml())
+    params = [xmldoc.getElementsByTagName(a)[0].firstChild.nodeValue for a in errors[code]]
+    raise PrecheckError(code, *params)
 
 def execute_precheck(session, control_package, yum_conf_file, update_precheck_file):
     if not control_package:
         return 'ok'
-    livepatch_messages = {'PATCH_PRECHECK_LIVEPATCH_COMPLETE': 'ok_livepatch_complete',
-                     'PATCH_PRECHECK_LIVEPATCH_INCOMPLETE': 'ok_livepatch_incomplete',
-                     'PATCH_PRECHECK_LIVEPATCH_NOT_APPLICABLE': 'ok'}
     yum_env = os.environ.copy()
     yum_env['LANG'] = 'C'
 
@@ -164,32 +160,28 @@ def execute_precheck(session, control_package, yum_conf_file, update_precheck_fi
             if ERROR_MESSAGE_CONFLICTS_WITH in errmsg and ERROR_MESSAGE_PROCESSING_CONFLICT in output:
                 regex = ERROR_MESSAGE_PROCESSING_CONFLICT + '(.*)' + ERROR_MESSAGE_CONFLICTS + '(.+?)\n'
                 conflict_tuples = re.findall(regex, output)
-                if len(conflict_tuples) > 0:
-                    conflict_updates = ''
-                    for tuple in conflict_tuples:
-                        conflict_updates += tuple[1] + ' '
-                    raise ConflictPresent(conflict_updates.rstrip())
-                else:
+                if len(conflict_tuples) <= 0:
                     raise PrecheckFailure(errmsg)
+                conflict_updates = ''.join(tuple[1] + ' ' for tuple in conflict_tuples)
+                raise ConflictPresent(conflict_updates.rstrip())
             elif ERROR_MESSAGE_VERSION_REQUIRED in errmsg and (ERROR_MESSAGE_VERSION_INSTALLED in errmsg or ERROR_MESSAGE_VERSION_UPDATED_BY in errmsg):
                 regex = ERROR_MESSAGE_VERSION_REQUIRED + '(.+?)\n.+ {2,2}(.+)$'
                 match = re.search(regex, errmsg, flags=re.DOTALL)
-                if match:
-                    required_version = match.group(1).rstrip()
-                    installed_version = match.group(2).rstrip()
-                    raise WrongServerVersion(required_version, installed_version)
-                else:
+                if not match:
                     raise PrecheckFailure(errmsg)
+                required_version = match.group(1).rstrip()
+                installed_version = match.group(2).rstrip()
+                raise WrongServerVersion(required_version, installed_version)
             elif ERROR_MESSAGE_PREREQUISITE in errmsg:
                 regex = ERROR_MESSAGE_PREREQUISITE + '(.+?)\n'
                 prerequisite_list = re.findall(regex, errmsg)
-                if len(prerequisite_list) > 0:
-                    prerequisite_updates = ''
-                    for prerequisite in prerequisite_list:
-                        prerequisite_updates += prerequisite + ' '
-                    raise PrerequisiteMissing(prerequisite_updates.rstrip())
-                else:
+                if len(prerequisite_list) <= 0:
                     raise PrecheckFailure(errmsg)
+                prerequisite_updates = ''.join(
+                    prerequisite + ' ' for prerequisite in prerequisite_list
+                )
+
+                raise PrerequisiteMissing(prerequisite_updates.rstrip())
             else:
                 raise PrecheckFailure(errmsg)
         else:
@@ -222,7 +214,10 @@ def execute_precheck(session, control_package, yum_conf_file, update_precheck_fi
         else:
             if '\n' in precheck_output:
                 msg = precheck_output.split()[0]
-                if msg in livepatch_messages.keys():
+                livepatch_messages = {'PATCH_PRECHECK_LIVEPATCH_COMPLETE': 'ok_livepatch_complete',
+                                 'PATCH_PRECHECK_LIVEPATCH_INCOMPLETE': 'ok_livepatch_incomplete',
+                                 'PATCH_PRECHECK_LIVEPATCH_NOT_APPLICABLE': 'ok'}
+                if msg in livepatch_messages:
                     return livepatch_messages[msg]
     return 'ok'
 
@@ -273,9 +268,7 @@ if __name__ == '__main__':
         try:
             os.makedirs(os.path.dirname(yum_conf_file))
         except OSError as e:
-            if e.errno == errno.EEXIST:
-                pass
-            else:
+            if e.errno != errno.EEXIST:
                 raise
         with open(yum_conf_file, "w+") as file:
             file.write(yum_conf)
@@ -288,7 +281,7 @@ if __name__ == '__main__':
         update_precheck_file = os.path.join(UPDATE_DIR, update_uuid, 'precheck')
         print(success_message(execute_precheck(session, control_package, yum_conf_file, update_precheck_file)))
     except PrecheckError as e:
-        print(failure_message(e.args[0], [update_package] + [a for a in e.args[1:]]))
+        print(failure_message(e.args[0], [update_package] + list(e.args[1:])))
     except PrerequisiteMissing as e:
         print(failure_message(UPDATE_PRECHECK_FAILED_PREREQUISITE_MISSING, [update_package, str(e)]))
     except ConflictPresent as e:
@@ -307,7 +300,7 @@ if __name__ == '__main__':
     except Exception as e:
         print(failure_message(UPDATE_PRECHECK_FAILED_UNKNOWN_ERROR, [update_package, str(e)]))
     finally:
-        if session is not None and update_vdi_valid is True:
+        if session is not None and update_vdi_valid:
             session.xenapi.pool_update.detach(update)
             session.xenapi.session.logout()
         try:

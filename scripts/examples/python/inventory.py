@@ -9,14 +9,14 @@ def read_kvpairs(filename):
    f = open(filename)
    all_entries = {}
    try:
-        for line in f.readlines():
-            equals = line.index("=")    
-            key = line[0:equals]
-            value = line[equals+1:].strip().strip("'")
-            all_entries[key] = value
+      for line in f.readlines():
+         equals = line.index("=")
+         key = line[:equals]
+         value = line[equals+1:].strip().strip("'")
+         all_entries[key] = value
    finally:
-        f.close()
-        return all_entries
+      f.close()
+      return all_entries
 
 
 def parse():

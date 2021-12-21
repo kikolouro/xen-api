@@ -52,9 +52,7 @@ def select(pifs, key):
 def save(session, host, pifs):
     """Commit changes"""
     # Check that device names are unique
-    devices = []
-    for ref in pifs.keys():
-        devices.append(pifs[ref]['device'][3:])
+    devices = [pifs[ref]['device'][3:] for ref in pifs.keys()]
     for i in set(devices):
         devices.remove(i)
     if devices != []:
@@ -67,10 +65,8 @@ def save(session, host, pifs):
         for vif in session.xenapi.network.get_VIFs(net):
             if session.xenapi.VIF.get_currently_attached(vif):
                 vifs.append(vif)
-    if len(vifs) > 0:
-        plural = ""
-        if len(vifs) > 1:
-            plural = "s"
+    if vifs:
+        plural = "s" if len(vifs) > 1 else ""
         print("WARNING: this operation requires unplugging %d guest network interface%s" % (len(vifs), plural))
         print("Are you sure you want to continue? (yes/no) > ", end=' ')
         if sys.stdin.readline().strip().lower() != "yes":
@@ -82,7 +78,7 @@ def save(session, host, pifs):
         uuid = session.xenapi.VM.get_uuid(vm)
         print("Hot-unplugging interface %s on VM %s" % (dev, uuid))
         session.xenapi.VIF.unplug(vif)
-        
+
     for ref in pifs.keys():
         mac = pifs[ref]['MAC']        
         if pifs[ref]['management']:
@@ -122,7 +118,7 @@ def renameif(session):
     for ref in pifs.keys():
         if pifs[ref]['host'] != host or pifs[ref]['physical'] != True:
             del pifs[ref]
-            
+
     while True:
         print("Current mappings:")
         show_pifs(pifs)
@@ -141,20 +137,18 @@ def renameif(session):
             save(session, host, pifs)
             sys.exit(0)
         pif = select(pifs, x)
-        if pif != None:
-            # Make sure this is not a slave's management PIF
-            if host != master and pifs[pif]['management']:
-                print("ERROR: cannot modify the management interface of a slave.")
-            else:
-                print("Selected NIC with MAC '%s'. Enter new NIC number:" % pifs[pif]['MAC'])
-                print("> ", end=' ')
-                nic = sys.stdin.readline().strip()
-                if not(nic.isdigit()):
-                    print("ERROR: must enter a number (e.g. 0, 1, 2, 3, ...)")
-                else:
-                    pifs[pif]['device'] = "eth" + nic
-        else:
+        if pif is None:
             print("NIC '%s' not found" % (x))
+        elif host != master and pifs[pif]['management']:
+            print("ERROR: cannot modify the management interface of a slave.")
+        else:
+            print("Selected NIC with MAC '%s'. Enter new NIC number:" % pifs[pif]['MAC'])
+            print("> ", end=' ')
+            nic = sys.stdin.readline().strip()
+            if not(nic.isdigit()):
+                print("ERROR: must enter a number (e.g. 0, 1, 2, 3, ...)")
+            else:
+                pifs[pif]['device'] = "eth" + nic
         print()
         
 

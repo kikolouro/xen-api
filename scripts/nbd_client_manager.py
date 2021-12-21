@@ -116,7 +116,7 @@ def _find_unused_nbd_device():
     connected according to nbd-client.
     Raises NbdDeviceNotFound if no devices are available.
     """
-    for device_no in range(0, 1000):
+    for device_no in range(1000):
         nbd_device = "/dev/nbd{}".format(device_no)
         if not _is_nbd_device_connected(nbd_device=nbd_device):
             return nbd_device
@@ -180,7 +180,7 @@ def connect_nbd(path, exportname):
             return nbd_device
         except NbdDeviceNotFound as exn:
             LOGGER.warn('Failed to find free nbd device: %s', exn)
-            retries = retries + 1
+            retries += 1
             if retries == 1:
                 # We sleep for a shorter period first, in case an nbd device
                 # will become available soon (e.g. during PV Linux guest bootstorm):

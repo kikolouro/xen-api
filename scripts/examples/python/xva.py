@@ -102,10 +102,7 @@ if __name__ == "__main__":
         parser.print_help()
         sys.exit(1)
 
-    fields = [ "sm_config" ]
-    if options.test:
-        fields = [ "other_config", "sm_config" ]
-
+    fields = [ "other_config", "sm_config" ] if options.test else [ "sm_config" ]
     xva = open_xva(options.input)
     for o in xva.list():
         try:

@@ -40,7 +40,7 @@ def register_vm_metrics(session, vm_ref, vgm):
 
 def vm_of_metrics(ref):
     global vgm_to_vm
-    if not(ref in vgm_to_vm.keys()):
+    if ref not in vgm_to_vm.keys():
         return None
     return vgm_to_vm[ref]    
 
@@ -60,11 +60,11 @@ def seen_possible_boot(session, vm_ref):
     global vm_boot_times
     global interesting_vms
     global boots_seen
-    if not(vm_ref in vm_boot_times.keys()) and vm_ref in interesting_vms:
+    if vm_ref not in vm_boot_times.keys() and vm_ref in interesting_vms:
         t = time.strftime( "%Y%m%dT%H:%M:%SZ", time.gmtime())
         vm_boot_times[vm_ref] = t
         boots_seen += 1
-        
+
         name = session.xenapi.VM.get_name_label(vm)        
         print("%d %s %s" % (boots_seen, name, t), file=sys.stdout)
         print("%d %s %s" % (boots_seen, name, t), file=sys.stderr)
@@ -145,7 +145,7 @@ or
     username = sys.argv[2] if len(sys.argv) > 2 else ""
     password = sys.argv[3] if len(sys.argv) > 3 else ""
 
-    if url == "http://localhost" or url == "localhost":
+    if url in ["http://localhost", "localhost"]:
         new_session = XenAPI.xapi_local()
     else:
         new_session = XenAPI.Session(url)

@@ -42,12 +42,11 @@ def read_management_conf():
 	return read_dict_file(management_conf)
 
 def write_inventory(inventory):
-	f = open(inventory_file, 'w')
-	for k in inventory:
-		f.write(k + "='" + inventory[k] + "'\n")
-	f.flush()
-	os.fsync(f.fileno())
-	f.close()
+	with open(inventory_file, 'w') as f:
+		for k in inventory:
+			f.write(k + "='" + inventory[k] + "'\n")
+		f.flush()
+		os.fsync(f.fileno())
 
 def valid_vlan(vlan):
 	if not re.match('^\d+$', vlan):
@@ -68,7 +67,7 @@ if __name__ == "__main__":
 	parser.add_option("--gateway", help="Gateway for new management interface", dest="gateway", default='')
 	parser.add_option("--dns", help="DNS server for new management interface", dest="dns", default='')
 	(options, args) = parser.parse_args()
-	
+
 	# Determine pool role
 	try:
 		f = open(pool_conf, 'r')
@@ -80,17 +79,14 @@ if __name__ == "__main__":
 				address = 'localhost'
 			else:
 				master = False
-				if options.address == None:
-					address = ls[1].strip()
-				else:
-					address = options.address
+				address = ls[1].strip() if options.address is None else options.address
 		finally:
 			f.close()
 	except:
 		pass
-	
+
 	# Get the management device from the firstboot data if not specified by the user
-	if options.device == None:
+	if options.device is None:
 		try:
 			conf = read_management_conf()
 			device = conf['LABEL']
@@ -123,16 +119,17 @@ if __name__ == "__main__":
 	if options.mode not in ["dhcp", "static"]:
 		parser.error('mode should be either "dhcp" or "static"')
 		sys.exit(1)
-		
+
 	if options.mode == 'static' and (options.ip == '' or options.netmask == ''):
 		parser.error("if static IP mode is selected, an IP address and netmask need to be specified")
 		sys.exit(1)
-	
+
 	# Warn user
 	if not os.access('/tmp/fist_network_reset_no_warning', os.F_OK):
-		configuration = []
-		configuration.append("Management interface:   " + device)
-		configuration.append("IP configuration mode:  " + options.mode)
+		configuration = [
+		    "Management interface:   " + device,
+		    "IP configuration mode:  " + options.mode,
+		]
 		if vlan != None:
 			configuration.append("Vlan:                   " + vlan)
 		if options.mode == "static":
@@ -142,7 +139,7 @@ if __name__ == "__main__":
 			configuration.append("Gateway:                " + options.gateway)
 		if options.dns != '':
 			configuration.append("DNS server(s):          " + options.dns)
-		if master == False:
+		if not master:
 			configuration.append("Pool master's address:  " + address)
 		warning = """----------------------------------------------------------------------
 !! WARNING !!
@@ -165,9 +162,9 @@ Type 'no' to cancel.
 		res = raw_input(warning + '\n'.join(configuration) + confirmation)
 		if res != 'yes':
 			sys.exit(1)
-	
+
 	# Update master's IP, if needed and given
-	if master == False and options.address != None:
+	if not master and options.address != None:
 		print("Setting master's ip (" + address + ")...")
 		try:
 			f = open(pool_conf, 'w')
@@ -178,15 +175,11 @@ Type 'no' to cancel.
 			f.close()
 
 	# Construct bridge name for management interface based on convention
-	if device[:3] == 'eth':
-		bridge = 'xenbr' + device[3:]
-	else:
-		bridge = 'br' + device
-	
+	bridge = 'xenbr' + device[3:] if device[:3] == 'eth' else 'br' + device
 	# Ensure xapi is not running
 	print("Stopping xapi...")
 	os.system('service xapi stop >/dev/null 2>/dev/null')
-	
+
 	# Reconfigure new management interface
 	print("Reconfiguring " + device + "...")
 	os.system('service xcp-network stop >/dev/null 2>/dev/null')
@@ -198,10 +191,7 @@ Type 'no' to cancel.
 	# Update interfaces in inventory file
 	print('Updating inventory file...')
 	inventory = read_inventory()
-	if vlan != None:
-		inventory['MANAGEMENT_INTERFACE'] = 'xentemp'
-	else:
-		inventory['MANAGEMENT_INTERFACE'] = bridge
+	inventory['MANAGEMENT_INTERFACE'] = 'xentemp' if vlan != None else bridge
 	inventory['CURRENT_INTERFACES'] = ''
 	write_inventory(inventory)
 
